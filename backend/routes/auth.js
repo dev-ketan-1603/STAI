@@ -16,7 +16,8 @@ router.post('/register', async (req, res) => {
     if (!name || !email || !password)
       return res.status(400).json({ error: 'Name, email and password are required.' });
 
-    const existing = findOne('users', u => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = await findOne('users', { email: cleanEmail });
     if (existing)
       return res.status(409).json({ error: 'An account with this email already exists.' });
 
@@ -24,12 +25,12 @@ router.post('/register', async (req, res) => {
     const user = {
       id: uuidv4(),
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       password: hashed,
       createdAt: new Date().toISOString(),
       hasCompletedDataCollection: false,
     };
-    insertOne('users', user);
+    await insertOne('users', user);
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({
@@ -48,17 +49,21 @@ router.post('/login', async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ error: 'Email and password are required.' });
 
-    const user = findOne('users', u => u.email.toLowerCase() === email.toLowerCase());
-    if (!user)
+    const cleanEmail = email.toLowerCase().trim();
+    // Query MongoDB Atlas directly in real-time
+    const user = await findOne('users', { email: cleanEmail });
+    if (!user) {
       return res.status(401).json({ error: 'Invalid email or password.' });
+    }
 
     if (!user.password) {
       return res.status(400).json({ error: 'This account was created with Google. Please use Google Sign-In.' });
     }
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match)
+    if (!match) {
       return res.status(401).json({ error: 'Invalid email or password.' });
+    }
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({
@@ -85,12 +90,10 @@ router.post('/google', async (req, res) => {
 
     // ── Path A: access_token + pre-fetched profile (from useGoogleLogin implicit flow) ──
     if (accessToken && profile?.email) {
-      // Verify the access_token is genuine by hitting Google's tokeninfo
       try {
         const infoRes = await fetch(
           `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
         );
-        // If it returns ok we trust the profile provided by the frontend (already fetched from userinfo)
         if (!infoRes.ok) throw new Error('Access token validation failed.');
         payload = {
           sub: profile.sub,
@@ -111,7 +114,6 @@ router.post('/google', async (req, res) => {
           const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: clientId });
           payload = ticket.getPayload();
         } else {
-          // Fallback: verify via Google tokeninfo endpoint (no client ID required)
           const infoRes = await fetch(
             `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
           );
@@ -135,15 +137,15 @@ router.post('/google', async (req, res) => {
     const name = payload.name || email.split('@')[0];
     const avatar = payload.picture || '';
 
-    // Check if user exists by googleId or email
-    let user = findOne('users', u => u.googleId === googleId || u.email.toLowerCase() === email);
+    // Check if user exists by googleId or email in MongoDB Atlas
+    let user = await findOne('users', { $or: [{ googleId }, { email }] });
 
     if (user) {
       const updates = {};
       if (!user.googleId) updates.googleId = googleId;
       if (!user.avatar && avatar) updates.avatar = avatar;
       if (Object.keys(updates).length > 0) {
-        user = updateOne('users', u => u.id === user.id, updates);
+        user = await updateOne('users', { id: user.id }, updates);
       }
     } else {
       user = {
@@ -152,11 +154,11 @@ router.post('/google', async (req, res) => {
         email,
         googleId,
         avatar,
-        password: null, // Google authenticated user
+        password: null,
         createdAt: new Date().toISOString(),
         hasCompletedDataCollection: false,
       };
-      insertOne('users', user);
+      await insertOne('users', user);
     }
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -183,7 +185,7 @@ router.post('/google-dev', async (req, res) => {
     const cleanEmail = email.toLowerCase().trim();
     const googleId = 'dev_google_' + Buffer.from(cleanEmail).toString('hex').slice(0, 16);
 
-    let user = findOne('users', u => u.googleId === googleId || u.email.toLowerCase() === cleanEmail);
+    let user = await findOne('users', { $or: [{ googleId }, { email: cleanEmail }] });
     if (!user) {
       user = {
         id: uuidv4(),
@@ -195,7 +197,7 @@ router.post('/google-dev', async (req, res) => {
         createdAt: new Date().toISOString(),
         hasCompletedDataCollection: false,
       };
-      insertOne('users', user);
+      await insertOne('users', user);
     }
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -214,9 +216,9 @@ router.post('/google-dev', async (req, res) => {
   }
 });
 
-// GET /api/auth/me — verify token & return user
-router.get('/me', authMiddleware, (req, res) => {
-  const user = findOne('users', u => u.id === req.userId);
+// GET /api/auth/me — verify token & return user directly from MongoDB Atlas
+router.get('/me', authMiddleware, async (req, res) => {
+  const user = await findOne('users', { id: req.userId });
   if (!user) return res.status(404).json({ error: 'User not found.' });
   res.json({
     user: {

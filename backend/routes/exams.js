@@ -5,13 +5,13 @@ import { authMiddleware } from '../middleware/auth.js';
 const router = express.Router();
 
 // GET /api/exams — get all exams for user
-router.get('/', authMiddleware, (req, res) => {
-  const record = findAll('exams', r => r.userId === req.userId)[0] || null;
+router.get('/', authMiddleware, async (req, res) => {
+  const record = (await findAll('exams', { userId: req.userId }))[0] || null;
   res.json({ exams: record?.exams || [] });
 });
 
 // POST /api/exams — save/replace all exams for user
-router.post('/', authMiddleware, (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   const { exams } = req.body;
   if (!Array.isArray(exams))
     return res.status(400).json({ error: 'exams must be an array.' });
@@ -21,7 +21,7 @@ router.post('/', authMiddleware, (req, res) => {
     exams,
     updatedAt: new Date().toISOString(),
   };
-  upsertOne('exams', r => r.userId === req.userId, doc);
+  await upsertOne('exams', { userId: req.userId }, doc);
   res.json({ success: true, exams });
 });
 

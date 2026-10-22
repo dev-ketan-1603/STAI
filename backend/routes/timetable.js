@@ -4,14 +4,14 @@ import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/timetable — get saved timetable
-router.get('/', authMiddleware, (req, res) => {
-  const record = findAll('timetable', r => r.userId === req.userId)[0] || null;
+// GET /api/timetable — get saved timetable directly from MongoDB
+router.get('/', authMiddleware, async (req, res) => {
+  const record = (await findAll('timetable', { userId: req.userId }))[0] || null;
   res.json({ timetable: record || null });
 });
 
 // POST /api/timetable — save timetable
-router.post('/', authMiddleware, (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   const { schedule, hoursPerDay } = req.body;
   if (!Array.isArray(schedule)) return res.status(400).json({ error: 'schedule must be an array.' });
 
@@ -21,7 +21,7 @@ router.post('/', authMiddleware, (req, res) => {
     hoursPerDay: hoursPerDay || 3,
     updatedAt: new Date().toISOString(),
   };
-  upsertOne('timetable', r => r.userId === req.userId, doc);
+  await upsertOne('timetable', { userId: req.userId }, doc);
   res.json({ success: true, timetable: doc });
 });
 

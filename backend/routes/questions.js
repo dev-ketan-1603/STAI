@@ -1,16 +1,16 @@
 // routes/questions.js — Generated practice questions
 
 import express from 'express';
-import { readDB, writeDB } from '../middleware/db.js';
+import { findAll, upsertOne } from '../middleware/db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // ─── GET /api/questions/:subject ──────────────────────────
-router.get('/:subject', authMiddleware, (req, res) => {
+router.get('/:subject', authMiddleware, async (req, res) => {
   try {
-    const all = readDB('questions');
-    const record = all.find(r => r.userId === req.user.id && r.subject === decodeURIComponent(req.params.subject));
+    const subject = decodeURIComponent(req.params.subject);
+    const record = (await findAll('questions', { userId: req.user.id, subject }))[0];
     res.json({ questions: record?.questions || [] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch questions.' });
@@ -18,17 +18,14 @@ router.get('/:subject', authMiddleware, (req, res) => {
 });
 
 // ─── POST /api/questions ──────────────────────────────────
-// Save generated questions for a subject
-router.post('/', authMiddleware, (req, res) => {
+// Save generated questions for a subject directly in MongoDB Atlas
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { subject, questions, topic } = req.body;
 
     if (!subject || !Array.isArray(questions)) {
       return res.status(400).json({ error: 'Subject and questions array are required.' });
     }
-
-    const all = readDB('questions');
-    const index = all.findIndex(r => r.userId === req.user.id && r.subject === subject);
 
     const record = {
       userId: req.user.id,
@@ -38,12 +35,7 @@ router.post('/', authMiddleware, (req, res) => {
       savedAt: new Date().toISOString(),
     };
 
-    if (index === -1) {
-      all.push(record);
-    } else {
-      all[index] = record;
-    }
-    writeDB('questions', all);
+    await upsertOne('questions', { userId: req.user.id, subject }, record);
 
     res.json({ message: 'Questions saved!', record });
   } catch (err) {

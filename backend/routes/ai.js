@@ -399,7 +399,7 @@ router.post('/schedule', authMiddleware, async (req, res) => {
 
   // Auto-fill subjects from profile if missing
   if (!subjects?.length) {
-    const edu = findAll('edu_data', r => r.userId === req.userId)[0];
+    const edu = (await findAll('edu_data', { userId: req.userId }))[0];
     if (edu?.subjects?.length) {
       subjects = edu.subjects;
     } else {
@@ -409,7 +409,7 @@ router.post('/schedule', authMiddleware, async (req, res) => {
 
   // Auto-fill exams from user exam records if missing
   if (!examDates?.length) {
-    const examRecord = findAll('exams', r => r.userId === req.userId)[0];
+    const examRecord = (await findAll('exams', { userId: req.userId }))[0];
     if (examRecord?.exams?.length) {
       examDates = examRecord.exams;
     }
