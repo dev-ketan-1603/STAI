@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+data/*.json
+!data/.gitkeep
+__pycache__/
+*.py[cod]
+npm-debug.log*
+.DS_Store
