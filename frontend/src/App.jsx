@@ -32,11 +32,8 @@ function GuestOnly({ children }) {
 
 function RequireEdu({ children }) {
   const { user, loading } = useAuth();
-  const location = useLocation();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (!user.hasCompletedDataCollection && location.pathname !== '/data-collection')
-    return <Navigate to="/data-collection" replace />;
   return children;
 }
 

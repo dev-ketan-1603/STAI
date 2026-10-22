@@ -18,7 +18,11 @@ export function AuthProvider({ children }) {
         return api.get('/profile/edu');
       })
       .then(({ data }) => { if (data.eduData) setEduData(data.eduData); })
-      .catch(() => { localStorage.removeItem('stai_token'); })
+      .catch(() => {
+        localStorage.removeItem('stai_token');
+        setUser(null);
+        setEduData(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,8 +43,12 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = async (identifier, password) => {
+    const { data } = await api.post('/auth/login', {
+      identifier: identifier.trim(),
+      email: identifier.trim(),
+      password
+    });
     return _afterLogin(data.token, data.user);
   };
 

@@ -45,15 +45,23 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ error: 'Email and password are required.' });
+    const rawIdentifier = (req.body.identifier || req.body.email || req.body.username || '').trim();
+    const { password } = req.body;
+    if (!rawIdentifier || !password)
+      return res.status(400).json({ error: 'Username or email, and password are required.' });
 
-    const cleanEmail = email.toLowerCase().trim();
-    // Query MongoDB Atlas directly in real-time
-    const user = await findOne('users', { email: cleanEmail });
+    const cleanIdentifier = rawIdentifier.toLowerCase();
+    const safeRegex = new RegExp(`^${rawIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+    // Query MongoDB Atlas directly by email or name/username
+    const user = await findOne('users', {
+      $or: [
+        { email: cleanIdentifier },
+        { name: safeRegex }
+      ]
+    });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'Invalid username/email or password.' });
     }
 
     if (!user.password) {
@@ -62,7 +70,7 @@ router.post('/login', async (req, res) => {
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'Invalid username/email or password.' });
     }
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -73,10 +81,10 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         avatar: user.avatar || '',
-        hasCompletedDataCollection: user.hasCompletedDataCollection,
+        hasCompletedDataCollection: Boolean(user.hasCompletedDataCollection),
       },
     });
-  } catch {
+  } catch (err) {
     res.status(500).json({ error: 'Login failed.' });
   }
 });

@@ -6,7 +6,7 @@ import GoogleSignInButton from '../components/GoogleSignInButton';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ identifier: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -14,18 +14,16 @@ export default function Login() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const user = await login(form.email, form.password);
-      if (user.hasCompletedDataCollection) navigate('/dashboard');
-      else navigate('/data-collection');
+      await login(form.identifier, form.password);
+      navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.error || err.message || 'Login failed. Please check your credentials.');
     }
     setLoading(false);
   };
 
-  const handleGoogleSuccess = (user) => {
-    if (user.hasCompletedDataCollection) navigate('/dashboard');
-    else navigate('/data-collection');
+  const handleGoogleSuccess = () => {
+    navigate('/dashboard');
   };
 
   const handleGoogleError = (msg) => setError(msg);
@@ -57,27 +55,37 @@ export default function Login() {
           {/* Divider */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-[#E0E0E0]" />
-            <span className="text-xs font-semibold text-[#999999] uppercase tracking-wide">or with email</span>
+            <span className="text-xs font-semibold text-[#999999] uppercase tracking-wide">or with credentials</span>
             <div className="flex-1 h-px bg-[#E0E0E0]" />
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {[
-              { label: 'Email', key: 'email', type: 'email', ph: 'you@example.com' },
-              { label: 'Password', key: 'password', type: 'password', ph: 'Your password' },
-            ].map(({ label, key, type, ph }) => (
-              <div key={key} className="flex flex-col gap-1.5">
-                <label className="text-[13px] font-semibold">{label}</label>
-                <input
-                  type={type}
-                  placeholder={ph}
-                  value={form[key]}
-                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                  required
-                  className="px-3.5 py-3 border-2 border-[#0D0D0D] rounded-[8px] text-sm outline-none focus:shadow-[0_0_0_3px_#87CEEB] transition-all"
-                />
-              </div>
-            ))}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-semibold">Username or Email</label>
+              <input
+                type="text"
+                placeholder="Enter your username or email"
+                value={form.identifier}
+                onChange={e => setForm(f => ({ ...f, identifier: e.target.value }))}
+                required
+                autoComplete="username"
+                className="px-3.5 py-3 border-2 border-[#0D0D0D] rounded-[8px] text-sm outline-none focus:shadow-[0_0_0_3px_#87CEEB] transition-all"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-semibold">Password</label>
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                required
+                autoComplete="current-password"
+                className="px-3.5 py-3 border-2 border-[#0D0D0D] rounded-[8px] text-sm outline-none focus:shadow-[0_0_0_3px_#87CEEB] transition-all"
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}

@@ -11,7 +11,7 @@ const COMMON_SUBJECTS = [
 ];
 
 export default function DataCollection() {
-  const { saveEduData } = useAuth();
+  const { user, logout, saveEduData } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -75,8 +75,12 @@ export default function DataCollection() {
         <div className="bg-white border-2 border-[#0D0D0D] rounded-[24px] p-8">
           {step === 1 && (
             <>
-              <h1 className="text-2xl font-extrabold mb-1">Tell us about yourself</h1>
-              <p className="text-sm text-[#555555] mb-6">This helps STAI personalise everything for you</p>
+              <h1 className="text-2xl font-extrabold mb-1">
+                {user?.name ? `Welcome, ${user.name}!` : 'Tell us about yourself'}
+              </h1>
+              <p className="text-sm text-[#555555] mb-6">
+                Tell us about your courses so STAI can personalize your study plan
+              </p>
 
               {error && <div className="bg-[#fff0f0] border-2 border-red-300 rounded-[8px] px-4 py-3 text-sm text-red-600 mb-4">{error}</div>}
 
@@ -169,6 +173,23 @@ export default function DataCollection() {
               </div>
             </>
           )}
+
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#E0E0E0] text-xs text-[#666666]">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="hover:text-[#0D0D0D] font-medium underline cursor-pointer"
+            >
+              Skip for now → Go to Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => { logout(); navigate('/login'); }}
+              className="hover:text-red-600 font-medium underline cursor-pointer"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </div>
     </div>

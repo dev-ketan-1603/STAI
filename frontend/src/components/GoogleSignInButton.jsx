@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -16,11 +16,19 @@ import api from '../utils/api';
  * Props:
  *   onSuccess(user) – called after successful login
  *   onError(msg)    – called on failure
- *   loading         – external loading state
- *   setLoading      – external setter
+ *   loading         – optional external loading state
+ *   setLoading      – optional external setter
  */
-export default function GoogleSignInButton({ onSuccess, onError, loading, setLoading }) {
+export default function GoogleSignInButton({
+  onSuccess,
+  onError,
+  loading: externalLoading,
+  setLoading: externalSetLoading
+}) {
   const { setSession } = useAuth();
+  const [internalLoading, setInternalLoading] = useState(false);
+  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
+  const setLoading = externalSetLoading || setInternalLoading;
 
   const handleSuccess = useCallback(async (tokenResponse) => {
     setLoading?.(true);

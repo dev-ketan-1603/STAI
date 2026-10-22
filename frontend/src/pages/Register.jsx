@@ -25,9 +25,8 @@ export default function Register() {
     setLoading(false);
   };
 
-  const handleGoogleSuccess = (user) => {
-    if (user.hasCompletedDataCollection) navigate('/dashboard');
-    else navigate('/data-collection');
+  const handleGoogleSuccess = () => {
+    navigate('/dashboard');
   };
 
   const handleGoogleError = (msg) => setError(msg);

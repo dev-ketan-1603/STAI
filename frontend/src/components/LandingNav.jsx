@@ -21,9 +21,19 @@ export default function LandingNav() {
       </div>
 
       <div className={`${menuOpen ? 'flex' : 'hidden'} md:flex flex-col md:flex-row gap-2 ml-auto absolute md:static top-[70px] left-0 right-0 bg-white md:bg-transparent border-b-2 md:border-0 border-[#0D0D0D] p-4 md:p-0`}>
-        <button onClick={() => scrollTo('features')} className="bg-transparent border-none font-body text-[15px] font-medium text-[#0D0D0D] px-4 py-2 rounded-[8px] hover:bg-[#87CEEB] transition-colors">Features</button>
-        <button onClick={() => scrollTo('how')} className="bg-transparent border-none font-body text-[15px] font-medium text-[#0D0D0D] px-4 py-2 rounded-[8px] hover:bg-[#87CEEB] transition-colors">How it works</button>
-        <button onClick={() => scrollTo('contact')} className="bg-transparent border-none font-body text-[15px] font-medium text-[#0D0D0D] px-4 py-2 rounded-[8px] hover:bg-[#87CEEB] transition-colors">Contact</button>
+        <button onClick={() => scrollTo('features')} className="bg-transparent border-none font-body text-[15px] font-medium text-[#0D0D0D] px-4 py-2 rounded-[8px] hover:bg-[#87CEEB] transition-colors text-left md:text-center">Features</button>
+        <button onClick={() => scrollTo('how')} className="bg-transparent border-none font-body text-[15px] font-medium text-[#0D0D0D] px-4 py-2 rounded-[8px] hover:bg-[#87CEEB] transition-colors text-left md:text-center">How it works</button>
+        <button onClick={() => scrollTo('contact')} className="bg-transparent border-none font-body text-[15px] font-medium text-[#0D0D0D] px-4 py-2 rounded-[8px] hover:bg-[#87CEEB] transition-colors text-left md:text-center">Contact</button>
+        <div className="flex md:hidden flex-col gap-2 pt-2 border-t border-[#E0E0E0] mt-1">
+          <button
+            className="bg-transparent border-2 border-[#0D0D0D] text-sm font-semibold px-5 py-2.5 rounded-[8px] hover:bg-[#F0F0F0] transition-colors text-[#0D0D0D] text-center"
+            onClick={() => { setMenuOpen(false); navigate('/login'); }}
+          >Login</button>
+          <button
+            className="bg-[#0D0D0D] text-[#FFFF66] border-2 border-[#0D0D0D] text-sm font-semibold px-5 py-2.5 rounded-[8px] hover:bg-[#1A1A1A] transition-colors text-center"
+            onClick={() => { setMenuOpen(false); navigate('/register'); }}
+          >Register</button>
+        </div>
       </div>
 
       <div className="hidden md:flex gap-2.5 ml-auto">
