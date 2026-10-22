@@ -1,51 +1,10 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { MongoClient } from 'mongodb';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 
 // In-memory cache for ultra-fast, zero-latency synchronous querying
 const cache = new Map();
 let mongoClient = null;
 let mongoDb = null;
 let isMongoConnected = false;
-
-// Ensure local data directory exists for fallback
-if (!fs.existsSync(DATA_DIR)) {
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  } catch (err) {
-    console.warn(`[DB] Could not create local data directory: ${err.message}`);
-  }
-}
-
-function getFilePath(name) {
-  return path.join(DATA_DIR, `${name}.json`);
-}
-
-function loadLocalFile(name) {
-  const filePath = getFilePath(name);
-  if (!fs.existsSync(filePath)) return [];
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalFile(name, data) {
-  try {
-    fs.writeFileSync(getFilePath(name), JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[DB] Local file write skipped for ${name}: ${err.message}`);
-    }
-  }
-}
 
 // Collection configuration with primary keys for atomic MongoDB operations
 const COLLECTION_KEYS = {
@@ -76,64 +35,52 @@ function getFilter(collection, doc) {
 }
 
 /**
- * Initialize Database Connection
- * Connects to MongoDB Atlas, builds indexes, and syncs data.
+ * Initialize MongoDB Atlas Connection
+ * Connects directly to MongoDB Atlas and pre-warms collections.
+ * Zero local JSON files used.
  */
 export async function initDB() {
   const uri = process.env.MONGODB_URI?.trim();
   if (!uri) {
-    console.log(`📁 Database: Local JSON file storage (Data dir: ${DATA_DIR})`);
-    console.log(`💡 Tip: Set MONGODB_URI in backend/.env to use MongoDB Atlas.`);
-    return false;
+    throw new Error(
+      '❌ Fatal: MONGODB_URI is required. Please set MONGODB_URI in your environment variables.'
+    );
   }
 
   try {
     console.log('🔄 Connecting to MongoDB Atlas...');
     mongoClient = new MongoClient(uri, {
-      maxPoolSize: 15,
+      maxPoolSize: 20,
       minPoolSize: 2,
-      serverSelectionTimeoutMS: 8000,
+      serverSelectionTimeoutMS: 10000,
       connectTimeoutMS: 10000,
     });
+
     await mongoClient.connect();
     const dbName = process.env.MONGODB_DB_NAME || 'stai';
     mongoDb = mongoClient.db(dbName);
     isMongoConnected = true;
     console.log(`✅ Database: Connected to MongoDB Atlas (DB: ${dbName})`);
 
-    // Known collections
+    // Pre-warm known collections into memory from MongoDB Atlas
     const collections = Object.keys(COLLECTION_KEYS);
-
     for (const name of collections) {
       try {
         const col = mongoDb.collection(name);
         const remoteDocs = await col.find({}).toArray();
         const cleaned = remoteDocs.map(({ _id, ...rest }) => rest);
-
-        if (cleaned.length > 0) {
-          cache.set(name, cleaned);
-        } else {
-          // If remote collection is empty, check if local file has data to auto-migrate
-          const localData = loadLocalFile(name);
-          if (localData.length > 0) {
-            console.log(`📦 Auto-migrating ${localData.length} records for "${name}" into MongoDB...`);
-            await col.insertMany(localData.map(d => ({ ...d })));
-            cache.set(name, localData);
-          } else {
-            cache.set(name, []);
-          }
-        }
+        cache.set(name, cleaned);
       } catch (colErr) {
-        console.warn(`[DB] Error loading collection ${name} from MongoDB:`, colErr.message);
+        console.warn(`[DB] Warning reading collection "${name}" from MongoDB:`, colErr.message);
+        cache.set(name, []);
       }
     }
 
     return true;
   } catch (err) {
     console.error(`❌ MongoDB connection failed: ${err.message}`);
-    console.log('⚠️  Falling back to local JSON file storage.');
     isMongoConnected = false;
-    return false;
+    throw err;
   }
 }
 
@@ -150,7 +97,7 @@ export function isDatabaseConnected() {
 }
 
 // ────────────────────────────────────────────────────────────
-// Atomic MongoDB Sync Helpers
+// Atomic MongoDB Operations
 // ────────────────────────────────────────────────────────────
 
 function asyncMongoInsert(collection, doc) {
@@ -223,21 +170,19 @@ function asyncMongoSyncAll(collection, data) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Public CRUD Methods (100% backward compatible with all routes)
+// Public CRUD Methods (Exclusively backed by MongoDB Atlas)
 // ────────────────────────────────────────────────────────────
 
 export function readDB(name) {
   if (cache.has(name)) {
     return cache.get(name);
   }
-  const data = loadLocalFile(name);
-  cache.set(name, data);
-  return data;
+  cache.set(name, []);
+  return [];
 }
 
 export function writeDB(name, data) {
   cache.set(name, data);
-  saveLocalFile(name, data);
   asyncMongoSyncAll(name, data);
 }
 
@@ -254,7 +199,6 @@ export function insertOne(collection, doc) {
   const data = readDB(collection);
   data.push(doc);
   cache.set(collection, data);
-  saveLocalFile(collection, data);
   asyncMongoInsert(collection, doc);
   return doc;
 }
@@ -267,7 +211,6 @@ export function updateOne(collection, predicate, updates) {
   const updated = { ...original, ...updates };
   data[idx] = updated;
   cache.set(collection, data);
-  saveLocalFile(collection, data);
   asyncMongoUpdate(collection, original, updates);
   return updated;
 }
@@ -281,7 +224,6 @@ export function upsertOne(collection, predicate, doc) {
     data[idx] = { ...data[idx], ...doc };
   }
   cache.set(collection, data);
-  saveLocalFile(collection, data);
   asyncMongoUpsert(collection, doc);
   return idx === -1 ? doc : data[data.findIndex(predicate)];
 }
@@ -293,7 +235,6 @@ export function deleteOne(collection, predicate) {
   const target = data[idx];
   data.splice(idx, 1);
   cache.set(collection, data);
-  saveLocalFile(collection, data);
   asyncMongoDelete(collection, target);
   return true;
 }

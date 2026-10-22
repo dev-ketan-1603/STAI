@@ -139,7 +139,7 @@ app.get('/api/health', (_, res) => {
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development',
-    database: process.env.MONGODB_URI ? 'mongodb' : 'json_file_storage',
+    database: 'mongodb',
   });
 });
 
