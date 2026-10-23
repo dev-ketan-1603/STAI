@@ -14,13 +14,17 @@ import api from '../utils/api';
  *  5. setSession() stores JWT and updates React auth state
  *
  * Props:
- *   onSuccess(user) – called after successful login
+ *   mode            – 'login' | 'register' (default: 'login')
+ *   onSuccess(user) – called after successful login/registration
+ *   onNotFound(info)– called when a new user tries to log in (mode='login') and account does not exist
  *   onError(msg)    – called on failure
  *   loading         – optional external loading state
  *   setLoading      – optional external setter
  */
 export default function GoogleSignInButton({
+  mode = 'login',
   onSuccess,
+  onNotFound,
   onError,
   loading: externalLoading,
   setLoading: externalSetLoading
@@ -32,17 +36,19 @@ export default function GoogleSignInButton({
 
   const handleSuccess = useCallback(async (tokenResponse) => {
     setLoading?.(true);
+    let profile = null;
     try {
       // 1. Fetch user profile using the Google access token
       const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
       });
       if (!infoRes.ok) throw new Error('Failed to get Google profile. Please try again.');
-      const profile = await infoRes.json();
+      profile = await infoRes.json();
 
-      // 2. Send to our backend
+      // 2. Send to our backend with mode
       const { data } = await api.post('/auth/google', {
         accessToken: tokenResponse.access_token,
+        mode,
         profile: {
           sub: profile.sub,
           email: profile.email,
@@ -55,12 +61,16 @@ export default function GoogleSignInButton({
       await setSession(data.token, data.user);
       onSuccess?.(data.user);
     } catch (err) {
+      if (err.response?.data?.notFound && onNotFound) {
+        onNotFound(err.response.data.profile || profile || {});
+        return;
+      }
       const msg = err.response?.data?.error || err.message || 'Google sign-in failed. Please try again.';
       onError?.(msg);
     } finally {
       setLoading?.(false);
     }
-  }, [setSession, onSuccess, onError, setLoading]);
+  }, [mode, setSession, onSuccess, onNotFound, onError, setLoading]);
 
   const handleError = useCallback(() => {
     onError?.('Google sign-in was cancelled or blocked. Please try again.');

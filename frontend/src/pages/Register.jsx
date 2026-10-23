@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
+  const location = useLocation();
+
+  const redirectMessage = location.state?.message || '';
+  const initialName = location.state?.name || (!location.state?.emailOrName?.includes('@') ? location.state?.emailOrName || '' : '');
+  const initialEmail = location.state?.email || (location.state?.emailOrName?.includes('@') ? location.state?.emailOrName || '' : '');
+
+  const [form, setForm] = useState({
+    name: initialName,
+    email: initialEmail,
+    password: '',
+    confirm: ''
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -46,14 +57,20 @@ export default function Register() {
           <h1 className="text-2xl font-extrabold mb-1">Create your account</h1>
           <p className="text-sm text-[#555555] mb-6">Start studying smarter with AI — it&apos;s free</p>
 
+          {redirectMessage && (
+            <div className="bg-[#fffbeb] border-2 border-[#fde047] rounded-[8px] px-4 py-3 text-sm text-[#854d0e] font-medium mb-4">
+              {redirectMessage}
+            </div>
+          )}
+
           {error && (
             <div className="bg-[#fff0f0] border-2 border-red-300 rounded-[8px] px-4 py-3 text-sm text-red-600 mb-4">
               {error}
             </div>
           )}
 
-          {/* Google Sign-In */}
-          <GoogleSignInButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+          {/* Google Sign-In with mode="register" */}
+          <GoogleSignInButton mode="register" onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-5">

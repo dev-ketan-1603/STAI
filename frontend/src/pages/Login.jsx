@@ -17,6 +17,15 @@ export default function Login() {
       await login(form.identifier, form.password);
       navigate('/dashboard');
     } catch (err) {
+      if (err.response?.data?.notFound) {
+        navigate('/register', {
+          state: {
+            emailOrName: form.identifier,
+            message: 'No account found with this username or email. Please register below to get started!'
+          }
+        });
+        return;
+      }
       setError(err.response?.data?.error || err.message || 'Login failed. Please check your credentials.');
     }
     setLoading(false);
@@ -24,6 +33,16 @@ export default function Login() {
 
   const handleGoogleSuccess = () => {
     navigate('/dashboard');
+  };
+
+  const handleGoogleNotFound = (profile) => {
+    navigate('/register', {
+      state: {
+        name: profile?.name || '',
+        email: profile?.email || '',
+        message: 'No STAI account found for this Google account. Please register below!'
+      }
+    });
   };
 
   const handleGoogleError = (msg) => setError(msg);
@@ -49,8 +68,13 @@ export default function Login() {
             </div>
           )}
 
-          {/* Google Sign-In */}
-          <GoogleSignInButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+          {/* Google Sign-In with mode="login" and onNotFound redirect */}
+          <GoogleSignInButton
+            mode="login"
+            onSuccess={handleGoogleSuccess}
+            onNotFound={handleGoogleNotFound}
+            onError={handleGoogleError}
+          />
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-5">

@@ -61,7 +61,10 @@ router.post('/login', async (req, res) => {
       ]
     });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid username/email or password.' });
+      return res.status(404).json({
+        error: 'No account found with this username or email. Please register first.',
+        notFound: true
+      });
     }
 
     if (!user.password) {
@@ -92,7 +95,7 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/google — authenticate via Google ID token or access_token + profile
 router.post('/google', async (req, res) => {
   try {
-    const { credential, accessToken, profile } = req.body;
+    const { credential, accessToken, profile, mode = 'login' } = req.body;
 
     let payload;
 
@@ -148,14 +151,17 @@ router.post('/google', async (req, res) => {
     // Check if user exists by googleId or email in MongoDB Atlas
     let user = await findOne('users', { $or: [{ googleId }, { email }] });
 
-    if (user) {
-      const updates = {};
-      if (!user.googleId) updates.googleId = googleId;
-      if (!user.avatar && avatar) updates.avatar = avatar;
-      if (Object.keys(updates).length > 0) {
-        user = await updateOne('users', { id: user.id }, updates);
+    if (!user) {
+      // If user does not exist and mode is login, do NOT auto-login or create account
+      if (mode === 'login') {
+        return res.status(404).json({
+          error: 'No account found with this Google account. Please register first.',
+          notFound: true,
+          profile: { email, name, picture: avatar }
+        });
       }
-    } else {
+
+      // Registration mode: create new account
       user = {
         id: uuidv4(),
         name,
@@ -167,6 +173,13 @@ router.post('/google', async (req, res) => {
         hasCompletedDataCollection: false,
       };
       await insertOne('users', user);
+    } else {
+      const updates = {};
+      if (!user.googleId) updates.googleId = googleId;
+      if (!user.avatar && avatar) updates.avatar = avatar;
+      if (Object.keys(updates).length > 0) {
+        user = await updateOne('users', { id: user.id }, updates);
+      }
     }
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -189,12 +202,19 @@ router.post('/google', async (req, res) => {
 // POST /api/auth/google-dev — quick test mock login for local development
 router.post('/google-dev', async (req, res) => {
   try {
-    const { email = 'student.google@example.com', name = 'Google Scholar' } = req.body;
+    const { email = 'student.google@example.com', name = 'Google Scholar', mode = 'login' } = req.body;
     const cleanEmail = email.toLowerCase().trim();
-    const googleId = 'dev_google_' + Buffer.from(cleanEmail).toString('hex').slice(0, 16);
+    const googleId = 'dev_google_' + Buffer.from(cleanEmail).toString('base64url');
 
     let user = await findOne('users', { $or: [{ googleId }, { email: cleanEmail }] });
     if (!user) {
+      if (mode === 'login') {
+        return res.status(404).json({
+          error: 'No account found with this Google account. Please register first.',
+          notFound: true,
+          profile: { email: cleanEmail, name }
+        });
+      }
       user = {
         id: uuidv4(),
         name,
