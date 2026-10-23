@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const EDUCATION_LEVELS = ['High School', 'Undergraduate', 'Postgraduate', 'PhD', 'Diploma', 'Professional Course', 'Other'];
+import {
+  EDUCATION_LEVELS,
+  COURSES_BY_LEVEL,
+  TERMS_BY_LEVEL,
+  SPECIALIZATIONS_BY_COURSE,
+  INSTITUTION_EXAMPLES,
+  findLevel,
+} from '../data/educationData';
 
 const COMMON_SUBJECTS = [
   'Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History',
@@ -18,8 +24,65 @@ export default function DataCollection() {
     institution: '', educationLevel: '', course: '',
     semester: '', specialization: '', subjects: [], customSubject: '',
   });
+  const [customCourse, setCustomCourse] = useState(false);
+  const [customSemester, setCustomSemester] = useState(false);
+  const [customSpec, setCustomSpec] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Derive active level key and cascading options from JSON data
+  const currentLevel = useMemo(() => findLevel(form.educationLevel), [form.educationLevel]);
+  const availableCourses = useMemo(() => currentLevel ? (COURSES_BY_LEVEL[currentLevel.value] || []) : [], [currentLevel]);
+  const termConfig = useMemo(() => currentLevel ? TERMS_BY_LEVEL[currentLevel.value] : null, [currentLevel]);
+  const availableSpecializations = useMemo(() => form.course ? (SPECIALIZATIONS_BY_COURSE[form.course] || []) : [], [form.course]);
+
+  const handleLevelChange = (e) => {
+    const val = e.target.value;
+    setForm(f => ({
+      ...f,
+      educationLevel: val,
+      course: '',
+      semester: '',
+      specialization: '',
+    }));
+    setCustomCourse(false);
+    setCustomSemester(false);
+    setCustomSpec(false);
+  };
+
+  const handleCourseSelect = (e) => {
+    const val = e.target.value;
+    if (val === '__custom__') {
+      setCustomCourse(true);
+      setForm(f => ({ ...f, course: '', specialization: '' }));
+    } else {
+      setCustomCourse(false);
+      setForm(f => ({ ...f, course: val, specialization: '' }));
+    }
+    setCustomSpec(false);
+  };
+
+  const handleSemesterSelect = (e) => {
+    const val = e.target.value;
+    if (val === '__custom__') {
+      setCustomSemester(true);
+      setForm(f => ({ ...f, semester: '' }));
+    } else {
+      setCustomSemester(false);
+      setForm(f => ({ ...f, semester: val }));
+    }
+  };
+
+  const handleSpecSelect = (e) => {
+    const val = e.target.value;
+    if (val === '__custom__') {
+      setCustomSpec(true);
+      setForm(f => ({ ...f, specialization: '' }));
+    } else {
+      setCustomSpec(false);
+      setForm(f => ({ ...f, specialization: val }));
+    }
+  };
 
   const toggleSubject = (sub) => setForm(f => ({
     ...f, subjects: f.subjects.includes(sub) ? f.subjects.filter(s => s !== sub) : [...f.subjects, sub]
@@ -85,36 +148,161 @@ export default function DataCollection() {
               {error && <div className="bg-[#fff0f0] border-2 border-red-300 rounded-[8px] px-4 py-3 text-sm text-red-600 mb-4">{error}</div>}
 
               <div className="flex flex-col gap-4">
+                {/* 1. Institution with Auto-Complete Suggestions */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[13px] font-semibold">Institution / School <span className="text-red-400">*</span></label>
-                  <input type="text" placeholder="e.g. IIT Delhi, DPS School" value={form.institution}
-                    onChange={e => setForm(f => ({...f, institution: e.target.value}))} className={inputCls} />
+                  <input
+                    type="text"
+                    list="institution-suggestions"
+                    placeholder="e.g. IIT Delhi, DPS School"
+                    value={form.institution}
+                    onChange={e => setForm(f => ({...f, institution: e.target.value}))}
+                    className={inputCls}
+                  />
+                  <datalist id="institution-suggestions">
+                    {INSTITUTION_EXAMPLES.map(inst => (
+                      <option key={inst} value={inst} />
+                    ))}
+                  </datalist>
                 </div>
+
+                {/* 2. Education Level Dropdown */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[13px] font-semibold">Education Level <span className="text-red-400">*</span></label>
-                  <select value={form.educationLevel} onChange={e => setForm(f => ({...f, educationLevel: e.target.value}))}
-                    className={inputCls + ' bg-white'}>
+                  <select
+                    value={form.educationLevel}
+                    onChange={handleLevelChange}
+                    className={inputCls + ' bg-white cursor-pointer'}
+                  >
                     <option value="">Select level…</option>
-                    {EDUCATION_LEVELS.map(l => <option key={l}>{l}</option>)}
+                    {EDUCATION_LEVELS.map(l => (
+                      <option key={l.value} value={l.label}>
+                        {l.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                {/* 3. Course / Stream & Semester / Year in 2 columns */}
+                <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+                  {/* Course / Stream Dropdown */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[13px] font-semibold">Course / Stream</label>
-                    <input type="text" placeholder="e.g. B.Tech CSE" value={form.course}
-                      onChange={e => setForm(f => ({...f, course: e.target.value}))} className={inputCls} />
+                    <div className="flex items-center justify-between">
+                      <label className="text-[13px] font-semibold">Course / Stream</label>
+                      {availableCourses.length > 0 && customCourse && (
+                        <button
+                          type="button"
+                          onClick={() => { setCustomCourse(false); setForm(f => ({ ...f, course: '' })); }}
+                          className="text-[11px] text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer"
+                        >
+                          Select from list
+                        </button>
+                      )}
+                    </div>
+
+                    {availableCourses.length > 0 && !customCourse ? (
+                      <select
+                        value={form.course}
+                        onChange={handleCourseSelect}
+                        className={inputCls + ' bg-white cursor-pointer'}
+                      >
+                        <option value="">Select course…</option>
+                        {availableCourses.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                        <option value="__custom__">✏️ Other (Custom)…</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder={availableCourses.length > 0 ? "Type custom course..." : (form.educationLevel ? "e.g. B.Tech, CBSE, Science" : "Select level first")}
+                        value={form.course}
+                        onChange={e => setForm(f => ({...f, course: e.target.value}))}
+                        className={inputCls}
+                      />
+                    )}
                   </div>
+
+                  {/* Semester / Year / Class / Stage Dropdown */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[13px] font-semibold">Semester / Year</label>
-                    <input type="text" placeholder="e.g. 3rd Sem" value={form.semester}
-                      onChange={e => setForm(f => ({...f, semester: e.target.value}))} className={inputCls} />
+                    <div className="flex items-center justify-between">
+                      <label className="text-[13px] font-semibold">
+                        {termConfig ? termConfig.label : 'Semester / Year'}
+                      </label>
+                      {termConfig?.options?.length > 0 && customSemester && (
+                        <button
+                          type="button"
+                          onClick={() => { setCustomSemester(false); setForm(f => ({ ...f, semester: '' })); }}
+                          className="text-[11px] text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer"
+                        >
+                          Select from list
+                        </button>
+                      )}
+                    </div>
+
+                    {termConfig?.options?.length > 0 && !customSemester ? (
+                      <select
+                        value={form.semester}
+                        onChange={handleSemesterSelect}
+                        className={inputCls + ' bg-white cursor-pointer'}
+                      >
+                        <option value="">Select {termConfig.label.toLowerCase()}…</option>
+                        {termConfig.options.map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                        <option value="__custom__">✏️ Other…</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder={termConfig ? `e.g. ${termConfig.options[0]}` : "e.g. 3rd Sem, Class 11"}
+                        value={form.semester}
+                        onChange={e => setForm(f => ({...f, semester: e.target.value}))}
+                        className={inputCls}
+                      />
+                    )}
                   </div>
                 </div>
+
+                {/* 4. Specialization Dropdown */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-semibold">Specialization (optional)</label>
-                  <input type="text" placeholder="e.g. AI/ML, Finance, Organic Chemistry" value={form.specialization}
-                    onChange={e => setForm(f => ({...f, specialization: e.target.value}))} className={inputCls} />
+                  <div className="flex items-center justify-between">
+                    <label className="text-[13px] font-semibold">Specialization (optional)</label>
+                    {availableSpecializations.length > 0 && customSpec && (
+                      <button
+                        type="button"
+                        onClick={() => { setCustomSpec(false); setForm(f => ({ ...f, specialization: '' })); }}
+                        className="text-[11px] text-blue-600 underline font-medium hover:text-blue-800 cursor-pointer"
+                      >
+                        Select from list
+                      </button>
+                    )}
+                  </div>
+
+                  {availableSpecializations.length > 0 && !customSpec ? (
+                    <select
+                      value={form.specialization}
+                      onChange={handleSpecSelect}
+                      className={inputCls + ' bg-white cursor-pointer'}
+                    >
+                      <option value="">Select specialization (optional)…</option>
+                      <option value="General / Core">General / Core (No specialization)</option>
+                      {availableSpecializations.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                      <option value="__custom__">✏️ Other (Custom)…</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="e.g. AI / ML, Finance, Organic Chemistry"
+                      value={form.specialization}
+                      onChange={e => setForm(f => ({...f, specialization: e.target.value}))}
+                      className={inputCls}
+                    />
+                  )}
                 </div>
+
                 <button onClick={handleNext}
                   className="mt-2 py-3 bg-[#0D0D0D] text-[#FFFF66] border-2 border-[#0D0D0D] rounded-[8px] font-display font-bold text-[15px] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_rgba(0,0,0,0.2)] transition-all">
                   Next: Choose Subjects →
