@@ -35,3 +35,6 @@ data/*.json
 Thumbs.db
 .vscode/
 .idea/
+
+# Generated assets
+banner.svg
