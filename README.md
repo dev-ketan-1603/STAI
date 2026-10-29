@@ -67,8 +67,8 @@ and never know what to study next. -->
 |---|---|
 | 🎨 Frontend | <!-- TODO e.g. React + Tailwind --> · hosted on **Vercel** |
 | ⚙️ Backend | <!-- TODO e.g. Node.js + Express --> · hosted on **Render** |
-| 🗄️ Database | <!-- TODO --> |
-| 🤖 AI / ML | <!-- TODO: model or API, and what it does --> |
+| 🗄️ Database | <!-- TODO --> Using MongoDB |
+| 🤖 AI / ML | <!-- TODO: model or API, and what it does --> . Gemini and Self built Pyhton based AI Model|
 
 ## 🔄 How It Works
 
