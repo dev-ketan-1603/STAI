@@ -40,7 +40,8 @@ export default function Login() {
       state: {
         name: profile?.name || '',
         email: profile?.email || '',
-        message: 'No STAI account found for this Google account. Please register below!'
+        googleMode: true,
+        message: 'No STAI account found for this Google account. Click "Continue with Google" below to create one instantly!'
       }
     });
   };

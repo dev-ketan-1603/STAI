@@ -57,10 +57,14 @@ async function callGoogleAIStudio(systemPrompt, userPrompt, maxTokens = 1500) {
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error('Missing Google AI Studio / Gemini API key.');
 
-  const preferredModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
+  const preferredModel = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
   const candidateModels = Array.from(
     new Set([
       preferredModel,
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
       'gemini-3.5-flash-lite',
       'gemini-3.1-flash-lite',
       'gemini-3.8-flash',
@@ -572,10 +576,88 @@ Recommend 4 to 6 specific, reputable study materials.`;
   }
 });
 
+function generateGrowthFallback(subject, avg, trend, scores) {
+  let strengths = [];
+  let weaknesses = [];
+  let suggestions = [];
+
+  if (avg >= 85) {
+    strengths = [
+      `Exceptional mastery of core principles and problem solving in ${subject}`,
+      `High test accuracy and consistent analytical reasoning`,
+      `Strong conceptual retention across progressive evaluations`,
+    ];
+    weaknesses = [
+      `Occasional missteps on nuanced edge cases and multi-variable synthesis`,
+      `Potential rushing through seemingly straightforward problems`,
+    ];
+    suggestions = [
+      `Challenge yourself with competition-level or advanced problem sets in ${subject}`,
+      `Explain complex ${subject} proofs or theorems to peers to solidify deep intuition`,
+      `Practice under strict timed test conditions to maintain composure on hard exams`,
+    ];
+  } else if (avg >= 70) {
+    strengths = [
+      `Solid grasp of foundational definitions and recurring ${subject} concepts`,
+      `Good execution on standard quiz questions and practical examples`,
+      trend === 'improving' ? 'Demonstrating an encouraging upward trajectory over recent tests' : 'Steady, reliable baseline score across evaluation checkpoints',
+    ];
+    weaknesses = [
+      `Struggling on multi-step application problems and unexpected question twists`,
+      `Time management challenges during longer assessment formats`,
+    ];
+    suggestions = [
+      `Dedicate 20-25 minutes daily to active recall on missed topics in ${subject}`,
+      `Review step-by-step answer keys immediately following quizzes to fix misconception patterns`,
+      `Create focused flashcard decks for essential formulas, terminology, and key edge cases`,
+    ];
+  } else {
+    strengths = [
+      `Proactive engagement and determination to benchmark performance in ${subject}`,
+      `Clear identification of foundational focus areas`,
+    ];
+    weaknesses = [
+      `Gaps in core prerequisite theory and standard terminology in ${subject}`,
+      `Hesitation when translating theoretical principles into problem-solving steps`,
+    ];
+    suggestions = [
+      `Revisit summary notes and high-yield tutorial videos for ${subject} before taking next quiz`,
+      `Start with shorter, 5-question focused practice quizzes to build speed and confidence`,
+      `Use spaced repetition to review foundational notes 2-3 times per week`,
+    ];
+  }
+
+  return {
+    strengths,
+    weaknesses,
+    suggestions,
+    overallScore: avg,
+    trend,
+  };
+}
+
 // POST /api/ai/growth
 router.post('/growth', authMiddleware, async (req, res) => {
   const { subject, scores, topics } = req.body;
   if (!subject) return res.status(400).json({ error: 'subject is required.' });
+
+  const validScores = (scores || [])
+    .map(s => (typeof s === 'object' && s !== null ? Number(s.score) : Number(s)))
+    .filter(n => !isNaN(n) && n >= 0 && n <= 100);
+
+  const avg =
+    validScores.length > 0
+      ? Math.round(validScores.reduce((sum, s) => sum + s, 0) / validScores.length)
+      : 75;
+
+  let trend = 'stable';
+  if (validScores.length >= 2) {
+    const diff = validScores[validScores.length - 1] - validScores[0];
+    if (diff >= 4) trend = 'improving';
+    else if (diff <= -4) trend = 'declining';
+  } else if (avg >= 80) {
+    trend = 'improving';
+  }
 
   try {
     const system = `You are a learning analytics mentor. Analyze performance data and return actionable insights.
@@ -597,27 +679,10 @@ Topics: ${(topics || []).join(', ')}`;
       return res.json(parsed);
     }
 
-    const avg =
-      scores?.length > 0
-        ? Math.round(scores.reduce((sum, s) => sum + (Number(s.score) || 0), 0) / scores.length)
-        : 75;
-
-    res.json({
-      strengths: [`Strong grasp of foundational ${subject} concepts`, 'Consistent quiz participation'],
-      weaknesses: ['Complex application problems under time constraints'],
-      suggestions: [`Dedicate 20 minutes daily to active recall on ${subject}`, 'Review mistakes immediately after quizzes'],
-      overallScore: avg,
-      trend: avg >= 75 ? 'improving' : 'stable',
-    });
+    return res.json(generateGrowthFallback(subject, avg, trend, validScores));
   } catch (err) {
-    console.warn('[AI Growth] AI call error, serving fallback:', err.message);
-    res.json({
-      strengths: [`Consistent engagement with ${subject}`],
-      weaknesses: ['Advanced multi-step derivations'],
-      suggestions: ['Practice timed quiz sessions and review step-by-step solutions'],
-      overallScore: 72,
-      trend: 'stable',
-    });
+    console.warn('[AI Growth] AI call error, serving dynamic analytics fallback:', err.message);
+    return res.json(generateGrowthFallback(subject, avg, trend, validScores));
   }
 });
 

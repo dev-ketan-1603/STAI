@@ -11,6 +11,8 @@ export default function Register() {
   const redirectMessage = location.state?.message || '';
   const initialName = location.state?.name || (!location.state?.emailOrName?.includes('@') ? location.state?.emailOrName || '' : '');
   const initialEmail = location.state?.email || (location.state?.emailOrName?.includes('@') ? location.state?.emailOrName || '' : '');
+  // True when arriving from Google sign-in "not found" redirect — no need to ask for email
+  const isGoogleMode = Boolean(location.state?.googleMode);
 
   const [form, setForm] = useState({
     name: initialName,
@@ -72,40 +74,45 @@ export default function Register() {
           {/* Google Sign-In with mode="register" */}
           <GoogleSignInButton mode="register" onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-[#E0E0E0]" />
-            <span className="text-xs font-semibold text-[#999999] uppercase tracking-wide">or with email</span>
-            <div className="flex-1 h-px bg-[#E0E0E0]" />
-          </div>
-
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {[
-              { label: 'Full Name', key: 'name', type: 'text', ph: 'Your name' },
-              { label: 'Email', key: 'email', type: 'email', ph: 'you@example.com' },
-              { label: 'Password', key: 'password', type: 'password', ph: 'Min. 6 characters' },
-              { label: 'Confirm Password', key: 'confirm', type: 'password', ph: 'Repeat password' },
-            ].map(({ label, key, type, ph }) => (
-              <div key={key} className="flex flex-col gap-1.5">
-                <label className="text-[13px] font-semibold">{label}</label>
-                <input
-                  type={type}
-                  placeholder={ph}
-                  value={form[key]}
-                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                  required
-                  className="px-3.5 py-3 border-2 border-[#0D0D0D] rounded-[8px] text-sm outline-none focus:shadow-[0_0_0_3px_#87CEEB] transition-all"
-                />
+          {/* Divider + email form only shown when NOT coming from a Google "not found" redirect */}
+          {!isGoogleMode && (
+            <>
+              {/* Divider */}
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-[#E0E0E0]" />
+                <span className="text-xs font-semibold text-[#999999] uppercase tracking-wide">or with email</span>
+                <div className="flex-1 h-px bg-[#E0E0E0]" />
               </div>
-            ))}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 py-3 bg-[#0D0D0D] text-[#FFFF66] border-2 border-[#0D0D0D] rounded-[8px] font-display font-bold text-[15px] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_rgba(0,0,0,0.2)] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creating account…' : 'Create Account →'}
-            </button>
-          </form>
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                {[
+                  { label: 'Full Name', key: 'name', type: 'text', ph: 'Your name' },
+                  { label: 'Email', key: 'email', type: 'email', ph: 'you@example.com' },
+                  { label: 'Password', key: 'password', type: 'password', ph: 'Min. 6 characters' },
+                  { label: 'Confirm Password', key: 'confirm', type: 'password', ph: 'Repeat password' },
+                ].map(({ label, key, type, ph }) => (
+                  <div key={key} className="flex flex-col gap-1.5">
+                    <label className="text-[13px] font-semibold">{label}</label>
+                    <input
+                      type={type}
+                      placeholder={ph}
+                      value={form[key]}
+                      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                      required
+                      className="px-3.5 py-3 border-2 border-[#0D0D0D] rounded-[8px] text-sm outline-none focus:shadow-[0_0_0_3px_#87CEEB] transition-all"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-2 py-3 bg-[#0D0D0D] text-[#FFFF66] border-2 border-[#0D0D0D] rounded-[8px] font-display font-bold text-[15px] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_rgba(0,0,0,0.2)] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Creating account…' : 'Create Account →'}
+                </button>
+              </form>
+            </>
+          )}
 
           <p className="text-center text-[13px] text-[#555555] mt-5">
             Already have an account?{' '}

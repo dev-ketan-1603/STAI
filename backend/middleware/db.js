@@ -158,7 +158,9 @@ export async function updateOne(collection, filterOrPredicate, updates) {
 export async function upsertOne(collection, filterOrPredicate, doc) {
   if (!mongoDb) return doc;
   const col = mongoDb.collection(collection);
-  const query = getFilter(collection, doc);
+  const query = (filterOrPredicate && typeof filterOrPredicate === 'object' && Object.keys(filterOrPredicate).length > 0)
+    ? filterOrPredicate
+    : getFilter(collection, doc);
   const { _id, ...cleanDoc } = doc;
   await col.replaceOne(query, cleanDoc, { upsert: true });
   return cleanDoc;
